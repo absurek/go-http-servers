@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: devdb
+    volumes:
+      - ..:/workspace:cached
+    command: sleep infinity
+    depends_on:
+      - dev-db
+
+  dev-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: devdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
