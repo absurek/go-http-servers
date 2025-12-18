@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/absurek/go-http-servers/internal/auth"
 	"github.com/absurek/go-http-servers/internal/database"
 	"github.com/absurek/go-http-servers/internal/response"
 	"github.com/google/uuid"
@@ -34,13 +35,15 @@ type chirpResponse struct {
 }
 
 type ChirpsHandler struct {
+	jwtSecret string
 	db        *sql.DB
 	dbQueries *database.Queries
 	logger    *log.Logger
 }
 
-func NewChirpsHandler(db *sql.DB, dbQueries *database.Queries, logger *log.Logger) *ChirpsHandler {
+func NewChirpsHandler(jwtSecret string, db *sql.DB, dbQueries *database.Queries, logger *log.Logger) *ChirpsHandler {
 	return &ChirpsHandler{
+		jwtSecret: jwtSecret,
 		db:        db,
 		dbQueries: dbQueries,
 		logger:    logger,
@@ -62,16 +65,24 @@ func cleanBody(body string) string {
 }
 
 func (h *ChirpsHandler) CreateChirp(w http.ResponseWriter, r *http.Request) {
-	var req createChirpRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
+	bearerToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
-		response.InvalidRequestBody(w)
+		h.logger.Printf("Error(CreateChirp): get bearer token: %v", err)
+		response.Unauthorized(w)
 		return
 	}
 
-	userID, err := uuid.Parse(req.UserID)
+	userID, err := auth.ValidateJWT(bearerToken, h.jwtSecret)
 	if err != nil {
+		h.logger.Printf("Error(CreateChirp): validate jwt: %v", err)
 		response.Unauthorized(w)
+		return
+	}
+
+	var req createChirpRequest
+	err = json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		response.InvalidRequestBody(w)
 		return
 	}
 

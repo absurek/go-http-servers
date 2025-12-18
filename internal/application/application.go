@@ -16,9 +16,10 @@ import (
 )
 
 type Application struct {
-	db     *sql.DB
-	server *http.Server
-	logger *log.Logger
+	jwtSecret string
+	db        *sql.DB
+	server    *http.Server
+	logger    *log.Logger
 
 	metrics *metrics.Metrics
 	website *website.Website
@@ -27,7 +28,9 @@ type Application struct {
 }
 
 func NewApplication(addr string, logger *log.Logger) (*Application, error) {
+	jwtSecret := os.Getenv("JWT_SECRET")
 	dbURL := os.Getenv("DB_URL")
+
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
@@ -43,7 +46,7 @@ func NewApplication(addr string, logger *log.Logger) (*Application, error) {
 	admin := admin.NewAdmin(db, dbQueries, metr, logger)
 	admin.SetupRoutes(mux)
 
-	api := api.NewApi(db, dbQueries, metr, logger)
+	api := api.NewApi(jwtSecret, db, dbQueries, metr, logger)
 	api.SetupRoutes(mux)
 
 	server := &http.Server{
@@ -52,13 +55,14 @@ func NewApplication(addr string, logger *log.Logger) (*Application, error) {
 	}
 
 	return &Application{
-		db:      db,
-		server:  server,
-		logger:  logger,
-		metrics: metr,
-		website: website,
-		admin:   admin,
-		api:     api,
+		jwtSecret: jwtSecret,
+		db:        db,
+		server:    server,
+		logger:    logger,
+		metrics:   metr,
+		website:   website,
+		admin:     admin,
+		api:       api,
 	}, nil
 }
 

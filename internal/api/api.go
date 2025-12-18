@@ -12,6 +12,7 @@ import (
 )
 
 type Api struct {
+	jwtSecret string
 	db        *sql.DB
 	dbQueries *database.Queries
 	metrics   *metrics.Metrics
@@ -21,11 +22,12 @@ type Api struct {
 	chirpsHandler *chirps.ChirpsHandler
 }
 
-func NewApi(db *sql.DB, dbQueries *database.Queries, metrics *metrics.Metrics, logger *log.Logger) *Api {
-	usersHandler := users.NewUsersHandler(db, dbQueries, logger)
-	chirpsHandler := chirps.NewChirpsHandler(db, dbQueries, logger)
+func NewApi(jwtSecret string, db *sql.DB, dbQueries *database.Queries, metrics *metrics.Metrics, logger *log.Logger) *Api {
+	usersHandler := users.NewUsersHandler(jwtSecret, db, dbQueries, logger)
+	chirpsHandler := chirps.NewChirpsHandler(jwtSecret, db, dbQueries, logger)
 
 	return &Api{
+		jwtSecret: jwtSecret,
 		db:        db,
 		dbQueries: dbQueries,
 		metrics:   metrics,
@@ -40,6 +42,7 @@ func (a *Api) SetupRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/healthz", a.GetHealthz)
 
 	mux.HandleFunc("POST /api/users", a.usersHandler.CreateUser)
+	mux.HandleFunc("POST /api/login", a.usersHandler.Login)
 
 	mux.HandleFunc("GET /api/chirps", a.chirpsHandler.GetAllChirps)
 	mux.HandleFunc("POST /api/chirps", a.chirpsHandler.CreateChirp)
