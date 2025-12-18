@@ -1,24 +1,29 @@
 package main
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/absurek/go-http-servers/internal/api"
+)
 
 const addr = ":8080"
 
 func main() {
+	apiCfg := api.NewConfig()
+
 	mux := &http.ServeMux{}
 	server := http.Server{
 		Handler: mux,
 		Addr:    addr,
 	}
 
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
+	mux.HandleFunc("GET /api/healthz", api.GetHealthz)
+	mux.HandleFunc("GET /admin/metrics", apiCfg.GetMetrics)
+	mux.HandleFunc("POST /admin/reset", apiCfg.ResetServerHits)
+	mux.HandleFunc("POST /api/validate_chirp", api.ValidateChirp)
 
-		w.Write([]byte("OK\n"))
-	})
-
-	mux.Handle("/app/", http.StripPrefix("/app/", http.FileServer(http.Dir("."))))
+	fileServerHandler := http.StripPrefix("/app/", http.FileServer(http.Dir(".")))
+	mux.Handle("/app/", apiCfg.ServerHitCounter(fileServerHandler))
 
 	server.ListenAndServe()
 }
