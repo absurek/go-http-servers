@@ -9,7 +9,7 @@ func InternalServerError(w http.ResponseWriter) {
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusInternalServerError)
 
-	payload, err := json.Marshal(response{
+	payload, err := json.Marshal(errorResponse{
 		ErrorText: "internal server error",
 	})
 	if err != nil {

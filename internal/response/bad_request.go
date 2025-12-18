@@ -9,7 +9,7 @@ func BadRequest(w http.ResponseWriter, errorText string) {
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
 
-	payload, err := json.Marshal(response{
+	payload, err := json.Marshal(errorResponse{
 		ErrorText: errorText,
 	})
 	if err != nil {

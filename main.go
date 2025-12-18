@@ -1,29 +1,25 @@
 package main
 
 import (
-	"net/http"
+	"log"
+	"os"
 
-	"github.com/absurek/go-http-servers/internal/api"
+	"github.com/absurek/go-http-servers/internal/application"
+	"github.com/joho/godotenv"
 )
 
 const addr = ":8080"
 
 func main() {
-	apiCfg := api.NewConfig()
+	godotenv.Load()
 
-	mux := &http.ServeMux{}
-	server := http.Server{
-		Handler: mux,
-		Addr:    addr,
+	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
+
+	app, err := application.NewApplication(addr, logger)
+	if err != nil {
+		logger.Fatalf("ERROR: Application init: %v", err)
 	}
+	defer app.Close()
 
-	mux.HandleFunc("GET /api/healthz", api.GetHealthz)
-	mux.HandleFunc("GET /admin/metrics", apiCfg.GetMetrics)
-	mux.HandleFunc("POST /admin/reset", apiCfg.ResetServerHits)
-	mux.HandleFunc("POST /api/validate_chirp", api.ValidateChirp)
-
-	fileServerHandler := http.StripPrefix("/app/", http.FileServer(http.Dir(".")))
-	mux.Handle("/app/", apiCfg.ServerHitCounter(fileServerHandler))
-
-	server.ListenAndServe()
+	app.ListenAndServe()
 }

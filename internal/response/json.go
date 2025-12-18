@@ -5,9 +5,9 @@ import (
 	"net/http"
 )
 
-func JSON[T any](w http.ResponseWriter, resp T) {
+func JSON[T any](w http.ResponseWriter, status int, resp T) {
 	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(status)
 
 	payload, err := json.Marshal(resp)
 	if err != nil {
