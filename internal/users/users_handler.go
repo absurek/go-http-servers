@@ -13,7 +13,8 @@ import (
 	"github.com/absurek/go-http-servers/internal/response"
 )
 
-const maxExpiresIn = 1 * time.Hour
+const jwtExpiresIn = 1 * time.Hour
+const refreshTokenExpiresIn = 60 * 24 * time.Hour
 
 type userRequest struct {
 	Email    string `json:"email"`
@@ -34,11 +35,16 @@ type userResponse struct {
 }
 
 type loginResponse struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Token     string    `json:"token"`
+	ID           string    `json:"id"`
+	Email        string    `json:"email"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Token        string    `json:"token"`
+	RefreshToken string    `json:"refresh_token"`
+}
+
+type refreshResponse struct {
+	Token string `json:"token"`
 }
 
 type UsersHandler struct {
@@ -123,18 +129,97 @@ func (h *UsersHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expiresIn := max(time.Duration(req.ExpiresInSeconds)*time.Second, maxExpiresIn)
-	jwt, err := auth.MakeJWT(user.ID, h.jwtSecret, expiresIn)
+	jwt, err := auth.MakeJWT(user.ID, h.jwtSecret, jwtExpiresIn)
 	if err != nil {
 		h.logger.Printf("Error(Login): make jwt (user_id=%s): %v", user.ID, err)
 		response.InternalServerError(w)
 	}
 
-	response.JSON(w, http.StatusOK, loginResponse{
-		ID:        user.ID.String(),
-		Email:     user.Email,
-		CreatedAt: user.CreatedAt.Time,
-		UpdatedAt: user.UpdatedAt.Time,
-		Token:     jwt,
+	refreshToken, err := auth.MakeRefreshToken()
+	if err != nil {
+		h.logger.Printf("Error(Login): make refresh token (user_id=%s): %v", user.ID, err)
+		response.InternalServerError(w)
+		return
+	}
+
+	_, err = h.dbQueries.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+		Token:     refreshToken,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(refreshTokenExpiresIn),
 	})
+	if err != nil {
+		h.logger.Printf("Error(Login): create refresh token (user_id=%s): %v", user.ID, err)
+		response.InternalServerError(w)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, loginResponse{
+		ID:           user.ID.String(),
+		Email:        user.Email,
+		CreatedAt:    user.CreatedAt.Time,
+		UpdatedAt:    user.UpdatedAt.Time,
+		Token:        jwt,
+		RefreshToken: refreshToken,
+	})
+}
+
+func (h *UsersHandler) Refresh(w http.ResponseWriter, r *http.Request) {
+	bearerToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		h.logger.Printf("Error(Refresh): get bearer token: %v", err)
+		response.Unauthorized(w)
+		return
+	}
+
+	refreshToken, err := h.dbQueries.GetRefreshToken(r.Context(), bearerToken)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			response.Unauthorized(w)
+		default:
+			h.logger.Printf("Error(Refresh): get refresh token: %v", err)
+			response.InternalServerError(w)
+		}
+
+		return
+	}
+	if refreshToken.ExpiresAt.Before(time.Now()) || refreshToken.RevokedAt.Valid {
+		response.Unauthorized(w)
+		return
+	}
+
+	jwt, err := auth.MakeJWT(refreshToken.UserID, h.jwtSecret, jwtExpiresIn)
+	if err != nil {
+		h.logger.Printf("Error(Refres): make jwt (user_id=%s): %v", refreshToken.UserID, err)
+		response.InternalServerError(w)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, refreshResponse{
+		Token: jwt,
+	})
+}
+
+func (h *UsersHandler) Revoke(w http.ResponseWriter, r *http.Request) {
+	refreshToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		h.logger.Printf("Error(Revoke): get bearer token: %v", err)
+		response.Unauthorized(w)
+		return
+	}
+
+	err = h.dbQueries.RevokeToken(r.Context(), refreshToken)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			response.Unauthorized(w)
+		default:
+			h.logger.Printf("Error(Revoke): revoke token: %v", err)
+			response.InternalServerError(w)
+		}
+
+		return
+	}
+
+	response.NoContent(w)
 }

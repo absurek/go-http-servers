@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,6 +12,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
+
+const refreshTokenLength int = 32
 
 func HashPassword(password string) (string, error) {
 	return argon2id.CreateHash(password, argon2id.DefaultParams)
@@ -57,4 +61,14 @@ func GetBearerToken(headers http.Header) (string, error) {
 	}
 
 	return parts[1], nil
+}
+
+func MakeRefreshToken() (string, error) {
+	token := make([]byte, refreshTokenLength)
+	_, err := rand.Read(token)
+	if err != nil {
+		return "", nil
+	}
+
+	return hex.EncodeToString(token), nil
 }
