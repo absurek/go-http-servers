@@ -42,6 +42,7 @@ func (a *Api) SetupRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/healthz", a.GetHealthz)
 
 	mux.HandleFunc("POST /api/users", a.usersHandler.CreateUser)
+	mux.HandleFunc("PUT /api/users", a.usersHandler.UpdateUser)
 	mux.HandleFunc("POST /api/login", a.usersHandler.Login)
 	mux.HandleFunc("POST /api/refresh", a.usersHandler.Refresh)
 	mux.HandleFunc("POST /api/revoke", a.usersHandler.Revoke)

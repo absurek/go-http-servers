@@ -21,12 +21,6 @@ type userRequest struct {
 	Password string `json:"password"`
 }
 
-type loginRequest struct {
-	Email            string `json:"email"`
-	Password         string `json:"password"`
-	ExpiresInSeconds int    `json:"expires_in_seconds"`
-}
-
 type userResponse struct {
 	ID        string    `json:"id"`
 	Email     string    `json:"email"`
@@ -96,11 +90,57 @@ func (h *UsersHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *UsersHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	jwt, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		response.Unauthorized(w)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(jwt, h.jwtSecret)
+	if err != nil {
+		response.Unauthorized(w)
+		return
+	}
+
+	var req userRequest
+	err = json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		response.InvalidRequestBody(w)
+		return
+	}
+
+	hashedPassword, err := auth.HashPassword(req.Password)
+	if err != nil {
+		h.logger.Panicf("Error(UpdateUser): hash password (user_id=%s): %v", userID, err)
+		response.InternalServerError(w)
+		return
+	}
+
+	user, err := h.dbQueries.UpdateUser(r.Context(), database.UpdateUserParams{
+		ID:             userID,
+		Email:          req.Email,
+		HashedPassword: hashedPassword,
+	})
+	if err != nil {
+		h.logger.Printf("Error(UpdateUser): update user (user_id=%s): %v", userID, err)
+		response.InternalServerError(w)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, userResponse{
+		ID:        user.ID.String(),
+		Email:     user.Email,
+		CreatedAt: user.CreatedAt.Time,
+		UpdatedAt: user.UpdatedAt.Time,
+	})
+}
+
 func (h *UsersHandler) Login(w http.ResponseWriter, r *http.Request) {
-	var req loginRequest
+	var req userRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		response.BadRequest(w, "invalid request schema")
+		response.InvalidRequestBody(w)
 		return
 	}
 
