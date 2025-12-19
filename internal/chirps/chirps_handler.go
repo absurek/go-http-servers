@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -113,14 +114,14 @@ func (h *ChirpsHandler) CreateChirp(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func parseOptionalUUID(s string) uuid.NullUUID {
-	id, err := uuid.Parse(s)
-	return uuid.NullUUID{UUID: id, Valid: err == nil}
-}
-
 func (h *ChirpsHandler) GetAllChirps(w http.ResponseWriter, r *http.Request) {
 	userIDString := r.URL.Query().Get("author_id")
 	userID := request.ParseOptionalUUID(userIDString)
+
+	sortOrder := r.URL.Query().Get("sort")
+	if sortOrder != "desc" {
+		sortOrder = "asc"
+	}
 
 	chirps, err := h.dbQueries.GetAllChirps(r.Context(), userID)
 	if err != nil {
@@ -137,6 +138,12 @@ func (h *ChirpsHandler) GetAllChirps(w http.ResponseWriter, r *http.Request) {
 			Body:      chirp.Body,
 			CreatedAt: chirp.CreatedAt.Time,
 			UpdatedAt: chirp.UpdatedAt.Time,
+		})
+	}
+
+	if sortOrder != "asc" {
+		sort.Slice(resp, func(i, j int) bool {
+			return resp[i].CreatedAt.After(resp[j].CreatedAt)
 		})
 	}
 
