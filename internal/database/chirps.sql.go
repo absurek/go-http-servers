@@ -11,6 +11,26 @@ import (
 	"github.com/google/uuid"
 )
 
+const checkChirpAccess = `-- name: CheckChirpAccess :one
+SELECT EXISTS (
+    SELECT 1
+    FROM chirps
+    WHERE id = $1 AND user_id = $2
+)
+`
+
+type CheckChirpAccessParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) CheckChirpAccess(ctx context.Context, arg CheckChirpAccessParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, checkChirpAccess, arg.ID, arg.UserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const createChirp = `-- name: CreateChirp :one
 INSERT INTO chirps (id, user_id, body, created_at, updated_at)
 VALUES (gen_random_uuid(), $1, $2, DEFAULT, DEFAULT)
@@ -33,6 +53,23 @@ func (q *Queries) CreateChirp(ctx context.Context, arg CreateChirpParams) (Chirp
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const deleteChirp = `-- name: DeleteChirp :execrows
+DELETE FROM chirps WHERE id = $1 AND user_id = $2
+`
+
+type DeleteChirpParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) DeleteChirp(ctx context.Context, arg DeleteChirpParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteChirp, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const getAllChirps = `-- name: GetAllChirps :many

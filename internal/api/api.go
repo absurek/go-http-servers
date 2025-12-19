@@ -50,4 +50,5 @@ func (a *Api) SetupRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/chirps", a.chirpsHandler.GetAllChirps)
 	mux.HandleFunc("POST /api/chirps", a.chirpsHandler.CreateChirp)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", a.chirpsHandler.GetChirp)
+	mux.HandleFunc("DELETE /api/chirps/{chirpID}", a.chirpsHandler.DeleteChirp)
 }

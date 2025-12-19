@@ -61,3 +61,9 @@ func Unauthorized(w http.ResponseWriter) {
 func NoContent(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func Forbidden(w http.ResponseWriter) {
+	JSON(w, http.StatusForbidden, errorResponse{
+		ErrorText: "forbidden",
+	})
+}

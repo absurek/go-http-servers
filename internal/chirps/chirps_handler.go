@@ -137,7 +137,6 @@ func (h *ChirpsHandler) GetChirp(w http.ResponseWriter, r *http.Request) {
 	pathChirpID := r.PathValue("chirpID")
 	chirpID, err := uuid.Parse(pathChirpID)
 	if err != nil {
-		h.logger.Printf("ERROR(GetChirp): invalid id: %s", pathChirpID)
 		response.BadRequest(w, "invalid chirp id")
 		return
 	}
@@ -162,4 +161,57 @@ func (h *ChirpsHandler) GetChirp(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: chirp.CreatedAt.Time,
 		UpdatedAt: chirp.UpdatedAt.Time,
 	})
+}
+
+func (h *ChirpsHandler) DeleteChirp(w http.ResponseWriter, r *http.Request) {
+	jwt, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		response.Unauthorized(w)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(jwt, h.jwtSecret)
+	if err != nil {
+		response.Unauthorized(w)
+		return
+	}
+
+	pathChirpID := r.PathValue("chirpID")
+	chirpID, err := uuid.Parse(pathChirpID)
+	if err != nil {
+		response.BadRequest(w, "invalid chirp id")
+		return
+	}
+
+	hasAccess, err := h.dbQueries.CheckChirpAccess(r.Context(), database.CheckChirpAccessParams{
+		ID:     chirpID,
+		UserID: userID,
+	})
+	if err != nil {
+		h.logger.Printf("Error(DeleteChirp): check chirp access (user_id=%s, chirp_id=%s): %v", userID, chirpID, err)
+		response.InternalServerError(w)
+		return
+	}
+
+	if !hasAccess {
+		response.Forbidden(w)
+		return
+	}
+
+	rowsAffected, err := h.dbQueries.DeleteChirp(r.Context(), database.DeleteChirpParams{
+		ID:     chirpID,
+		UserID: userID,
+	})
+	if err != nil {
+		h.logger.Printf("Error(DeleteChirp): delete chirp (user_id=%s chirp_id=%s): %v", userID, chirpID, err)
+		response.InternalServerError(w)
+		return
+	}
+
+	if rowsAffected == 0 {
+		response.NotFound(w)
+		return
+	}
+
+	response.NoContent(w)
 }
