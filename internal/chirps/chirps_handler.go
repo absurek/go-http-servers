@@ -11,6 +11,7 @@ import (
 
 	"github.com/absurek/go-http-servers/internal/auth"
 	"github.com/absurek/go-http-servers/internal/database"
+	"github.com/absurek/go-http-servers/internal/request"
 	"github.com/absurek/go-http-servers/internal/response"
 	"github.com/absurek/go-http-servers/internal/settings"
 	"github.com/google/uuid"
@@ -112,8 +113,16 @@ func (h *ChirpsHandler) CreateChirp(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func parseOptionalUUID(s string) uuid.NullUUID {
+	id, err := uuid.Parse(s)
+	return uuid.NullUUID{UUID: id, Valid: err == nil}
+}
+
 func (h *ChirpsHandler) GetAllChirps(w http.ResponseWriter, r *http.Request) {
-	chirps, err := h.dbQueries.GetAllChirps(r.Context())
+	userIDString := r.URL.Query().Get("author_id")
+	userID := request.ParseOptionalUUID(userIDString)
+
+	chirps, err := h.dbQueries.GetAllChirps(r.Context(), userID)
 	if err != nil {
 		h.logger.Printf("ERROR(GetAllChirps): db get all chirps: %v", err)
 		response.InternalServerError(w)

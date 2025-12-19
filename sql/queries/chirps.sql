@@ -4,7 +4,9 @@ VALUES (gen_random_uuid(), $1, $2, DEFAULT, DEFAULT)
 RETURNING *;
 
 -- name: GetAllChirps :many
-SELECT * FROM chirps ORDER BY created_at;
+SELECT * FROM chirps 
+WHERE (sqlc.narg('user_id')::uuid IS NULL OR user_id = sqlc.narg('user_id'))
+ORDER BY created_at;
 
 -- name: GetChirpByID :one
 SELECT * FROM chirps WHERE id = $1;
