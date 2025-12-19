@@ -1,11 +1,15 @@
 package application
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/absurek/go-http-servers/internal/admin"
 	"github.com/absurek/go-http-servers/internal/api"
@@ -72,4 +76,19 @@ func (a *Application) ListenAndServe() error {
 
 func (a *Application) Close() error {
 	return a.db.Close()
+}
+
+func (a *Application) ListenForInterrupt() {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	sig := <-sigCh
+	a.logger.Printf("Received signal %s. Shutting down...\n", sig)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := a.server.Shutdown(ctx); err != nil {
+		a.logger.Fatal("Graceful shutdown failed:", err)
+	}
 }
