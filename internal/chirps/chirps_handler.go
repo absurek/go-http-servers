@@ -12,6 +12,7 @@ import (
 	"github.com/absurek/go-http-servers/internal/auth"
 	"github.com/absurek/go-http-servers/internal/database"
 	"github.com/absurek/go-http-servers/internal/response"
+	"github.com/absurek/go-http-servers/internal/settings"
 	"github.com/google/uuid"
 )
 
@@ -35,15 +36,15 @@ type chirpResponse struct {
 }
 
 type ChirpsHandler struct {
-	jwtSecret string
+	settings  settings.Settings
 	db        *sql.DB
 	dbQueries *database.Queries
 	logger    *log.Logger
 }
 
-func NewChirpsHandler(jwtSecret string, db *sql.DB, dbQueries *database.Queries, logger *log.Logger) *ChirpsHandler {
+func NewChirpsHandler(s settings.Settings, db *sql.DB, dbQueries *database.Queries, logger *log.Logger) *ChirpsHandler {
 	return &ChirpsHandler{
-		jwtSecret: jwtSecret,
+		settings:  s,
 		db:        db,
 		dbQueries: dbQueries,
 		logger:    logger,
@@ -72,7 +73,7 @@ func (h *ChirpsHandler) CreateChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := auth.ValidateJWT(bearerToken, h.jwtSecret)
+	userID, err := auth.ValidateJWT(bearerToken, h.settings.JWTSecret)
 	if err != nil {
 		h.logger.Printf("Error(CreateChirp): validate jwt: %v", err)
 		response.Unauthorized(w)
@@ -170,7 +171,7 @@ func (h *ChirpsHandler) DeleteChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := auth.ValidateJWT(jwt, h.jwtSecret)
+	userID, err := auth.ValidateJWT(jwt, h.settings.JWTSecret)
 	if err != nil {
 		response.Unauthorized(w)
 		return

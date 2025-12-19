@@ -8,11 +8,13 @@ import (
 	"github.com/absurek/go-http-servers/internal/chirps"
 	"github.com/absurek/go-http-servers/internal/database"
 	"github.com/absurek/go-http-servers/internal/metrics"
+	"github.com/absurek/go-http-servers/internal/polka"
+	"github.com/absurek/go-http-servers/internal/settings"
 	"github.com/absurek/go-http-servers/internal/users"
 )
 
 type Api struct {
-	jwtSecret string
+	settings  settings.Settings
 	db        *sql.DB
 	dbQueries *database.Queries
 	metrics   *metrics.Metrics
@@ -20,14 +22,16 @@ type Api struct {
 
 	usersHandler  *users.UsersHandler
 	chirpsHandler *chirps.ChirpsHandler
+	polkaHandler  *polka.PolkaHandler
 }
 
-func NewApi(jwtSecret string, db *sql.DB, dbQueries *database.Queries, metrics *metrics.Metrics, logger *log.Logger) *Api {
-	usersHandler := users.NewUsersHandler(jwtSecret, db, dbQueries, logger)
-	chirpsHandler := chirps.NewChirpsHandler(jwtSecret, db, dbQueries, logger)
+func NewApi(s settings.Settings, db *sql.DB, dbQueries *database.Queries, metrics *metrics.Metrics, logger *log.Logger) *Api {
+	usersHandler := users.NewUsersHandler(s, db, dbQueries, logger)
+	chirpsHandler := chirps.NewChirpsHandler(s, db, dbQueries, logger)
+	polkaHandler := polka.NewPolkaHandler(s, db, dbQueries, logger)
 
 	return &Api{
-		jwtSecret: jwtSecret,
+		settings:  s,
 		db:        db,
 		dbQueries: dbQueries,
 		metrics:   metrics,
@@ -35,6 +39,7 @@ func NewApi(jwtSecret string, db *sql.DB, dbQueries *database.Queries, metrics *
 
 		usersHandler:  usersHandler,
 		chirpsHandler: chirpsHandler,
+		polkaHandler:  polkaHandler,
 	}
 }
 
@@ -51,4 +56,6 @@ func (a *Api) SetupRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/chirps", a.chirpsHandler.CreateChirp)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", a.chirpsHandler.GetChirp)
 	mux.HandleFunc("DELETE /api/chirps/{chirpID}", a.chirpsHandler.DeleteChirp)
+
+	mux.HandleFunc("POST /api/polka/webhooks", a.polkaHandler.Webhooks)
 }

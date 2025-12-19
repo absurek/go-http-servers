@@ -11,6 +11,7 @@ import (
 	"github.com/absurek/go-http-servers/internal/auth"
 	"github.com/absurek/go-http-servers/internal/database"
 	"github.com/absurek/go-http-servers/internal/response"
+	"github.com/absurek/go-http-servers/internal/settings"
 )
 
 const jwtExpiresIn = 1 * time.Hour
@@ -22,10 +23,11 @@ type userRequest struct {
 }
 
 type userResponse struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          string    `json:"id"`
+	Email       string    `json:"email"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	IsChirpyRed bool      `json:"is_chirpy_red"`
 }
 
 type loginResponse struct {
@@ -34,6 +36,7 @@ type loginResponse struct {
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 	Token        string    `json:"token"`
+	IsChirpyRed  bool      `json:"is_chirpy_red"`
 	RefreshToken string    `json:"refresh_token"`
 }
 
@@ -42,15 +45,15 @@ type refreshResponse struct {
 }
 
 type UsersHandler struct {
-	jwtSecret string
+	settings  settings.Settings
 	db        *sql.DB
 	dbQueries *database.Queries
 	logger    *log.Logger
 }
 
-func NewUsersHandler(jwtSecret string, db *sql.DB, dbQueries *database.Queries, logger *log.Logger) *UsersHandler {
+func NewUsersHandler(s settings.Settings, db *sql.DB, dbQueries *database.Queries, logger *log.Logger) *UsersHandler {
 	return &UsersHandler{
-		jwtSecret: jwtSecret,
+		settings:  s,
 		db:        db,
 		dbQueries: dbQueries,
 		logger:    logger,
@@ -83,10 +86,11 @@ func (h *UsersHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.JSON(w, http.StatusCreated, userResponse{
-		ID:        user.ID.String(),
-		Email:     user.Email,
-		CreatedAt: user.CreatedAt.Time,
-		UpdatedAt: user.UpdatedAt.Time,
+		ID:          user.ID.String(),
+		Email:       user.Email,
+		CreatedAt:   user.CreatedAt.Time,
+		UpdatedAt:   user.UpdatedAt.Time,
+		IsChirpyRed: user.IsChirpyRed.Bool,
 	})
 }
 
@@ -97,7 +101,7 @@ func (h *UsersHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := auth.ValidateJWT(jwt, h.jwtSecret)
+	userID, err := auth.ValidateJWT(jwt, h.settings.JWTSecret)
 	if err != nil {
 		response.Unauthorized(w)
 		return
@@ -129,10 +133,11 @@ func (h *UsersHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.JSON(w, http.StatusOK, userResponse{
-		ID:        user.ID.String(),
-		Email:     user.Email,
-		CreatedAt: user.CreatedAt.Time,
-		UpdatedAt: user.UpdatedAt.Time,
+		ID:          user.ID.String(),
+		Email:       user.Email,
+		CreatedAt:   user.CreatedAt.Time,
+		UpdatedAt:   user.UpdatedAt.Time,
+		IsChirpyRed: user.IsChirpyRed.Bool,
 	})
 }
 
@@ -169,7 +174,7 @@ func (h *UsersHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jwt, err := auth.MakeJWT(user.ID, h.jwtSecret, jwtExpiresIn)
+	jwt, err := auth.MakeJWT(user.ID, h.settings.JWTSecret, jwtExpiresIn)
 	if err != nil {
 		h.logger.Printf("Error(Login): make jwt (user_id=%s): %v", user.ID, err)
 		response.InternalServerError(w)
@@ -198,6 +203,7 @@ func (h *UsersHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Email:        user.Email,
 		CreatedAt:    user.CreatedAt.Time,
 		UpdatedAt:    user.UpdatedAt.Time,
+		IsChirpyRed:  user.IsChirpyRed.Bool,
 		Token:        jwt,
 		RefreshToken: refreshToken,
 	})
@@ -228,7 +234,7 @@ func (h *UsersHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jwt, err := auth.MakeJWT(refreshToken.UserID, h.jwtSecret, jwtExpiresIn)
+	jwt, err := auth.MakeJWT(refreshToken.UserID, h.settings.JWTSecret, jwtExpiresIn)
 	if err != nil {
 		h.logger.Printf("Error(Refres): make jwt (user_id=%s): %v", refreshToken.UserID, err)
 		response.InternalServerError(w)

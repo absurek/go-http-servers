@@ -15,15 +15,16 @@ import (
 	"github.com/absurek/go-http-servers/internal/api"
 	"github.com/absurek/go-http-servers/internal/database"
 	"github.com/absurek/go-http-servers/internal/metrics"
+	"github.com/absurek/go-http-servers/internal/settings"
 	"github.com/absurek/go-http-servers/internal/website"
 	_ "github.com/lib/pq"
 )
 
 type Application struct {
-	jwtSecret string
-	db        *sql.DB
-	server    *http.Server
-	logger    *log.Logger
+	settings settings.Settings
+	db       *sql.DB
+	server   *http.Server
+	logger   *log.Logger
 
 	metrics *metrics.Metrics
 	website *website.Website
@@ -32,10 +33,9 @@ type Application struct {
 }
 
 func NewApplication(addr string, logger *log.Logger) (*Application, error) {
-	jwtSecret := os.Getenv("JWT_SECRET")
-	dbURL := os.Getenv("DB_URL")
+	settings := settings.NewSettings()
 
-	db, err := sql.Open("postgres", dbURL)
+	db, err := sql.Open("postgres", settings.DBUrl)
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
@@ -50,7 +50,7 @@ func NewApplication(addr string, logger *log.Logger) (*Application, error) {
 	admin := admin.NewAdmin(db, dbQueries, metr, logger)
 	admin.SetupRoutes(mux)
 
-	api := api.NewApi(jwtSecret, db, dbQueries, metr, logger)
+	api := api.NewApi(settings, db, dbQueries, metr, logger)
 	api.SetupRoutes(mux)
 
 	server := &http.Server{
@@ -59,14 +59,14 @@ func NewApplication(addr string, logger *log.Logger) (*Application, error) {
 	}
 
 	return &Application{
-		jwtSecret: jwtSecret,
-		db:        db,
-		server:    server,
-		logger:    logger,
-		metrics:   metr,
-		website:   website,
-		admin:     admin,
-		api:       api,
+		settings: settings,
+		db:       db,
+		server:   server,
+		logger:   logger,
+		metrics:  metr,
+		website:  website,
+		admin:    admin,
+		api:      api,
 	}, nil
 }
 

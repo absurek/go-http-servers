@@ -56,7 +56,7 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 func GetBearerToken(headers http.Header) (string, error) {
 	authHeader := headers.Get("Authorization")
 	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 {
+	if len(parts) != 2 || parts[0] != "Bearer" {
 		return "", fmt.Errorf("malformed authorization header: %s", authHeader)
 	}
 
@@ -71,4 +71,14 @@ func MakeRefreshToken() (string, error) {
 	}
 
 	return hex.EncodeToString(token), nil
+}
+
+func GetApiKey(headers http.Header) (string, error) {
+	authHeader := headers.Get("Authorization")
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "ApiKey" {
+		return "", fmt.Errorf("malformed authorization header: %s", authHeader)
+	}
+
+	return parts[1], nil
 }
